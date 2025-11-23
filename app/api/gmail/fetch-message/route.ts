@@ -16,7 +16,7 @@ export async function POST(req: Request) {
     const messageId = body.messageId;
     if (!messageId) return NextResponse.json({ error: "messageId required" }, { status: 400 });
 
-    const session = await getSession(req);
+    const session = await getSession(req, null);
     const agent_id = session.user?.agent_id;
     if (!agent_id) return NextResponse.json({ error: "Not authenticated (no agent_id)" }, { status: 401 });
 
