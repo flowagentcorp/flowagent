@@ -1,15 +1,13 @@
-import { getIronSession, IronSessionOptions } from "iron-session";
-import { cookies } from "next/headers";
+// lib/session.ts
+import { getIronSession, IronSession } from "iron-session";
+import type { IronSessionOptions } from "iron-session";
 
-// 👇 Toto rozšíri typ session tak, aby TS vedel, že session.user existuje
-declare module "iron-session" {
-  interface IronSessionData {
-    user?: {
-      agent_id?: string;
-      email?: string;
-    };
-  }
-}
+export type SessionData = {
+  user?: {
+    agent_id: string;
+    email: string;
+  };
+};
 
 export const sessionOptions: IronSessionOptions = {
   cookieName: "agent_session",
@@ -20,9 +18,7 @@ export const sessionOptions: IronSessionOptions = {
   },
 };
 
-// 🚀 Toto je moderný spôsob pre Next.js App Router
-export async function getSession() {
-  const cookieStore = cookies(); // App Router cookie manager
-  const session = await getIronSession(cookieStore, sessionOptions);
-  return session;
+// MUST PASS req + res (Next.js API route style)
+export function getSession(req: Request, res: any): Promise<IronSession<SessionData>> {
+  return getIronSession(req, res, sessionOptions);
 }
