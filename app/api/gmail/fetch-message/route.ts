@@ -28,8 +28,7 @@ export async function POST(req: Request) {
       );
 
     // ✅ App Router verzia getSession()
-    const session = await getSession();
-
+    const session = await getSession(req as any, {} as any);
     const agent_id = session.user?.agent_id;
     if (!agent_id)
       return NextResponse.json(
