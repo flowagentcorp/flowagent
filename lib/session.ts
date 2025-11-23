@@ -2,9 +2,11 @@
 import { getIronSession, IronSession } from "iron-session";
 import type { SessionOptions } from "iron-session";
 
-export type SessionUser = {
-  agent_id?: string;
-  email?: string;
+export type SessionData = {
+  user?: {
+    agent_id?: string;
+    email?: string;
+  };
 };
 
 export const sessionOptions: SessionOptions = {
@@ -17,5 +19,5 @@ export const sessionOptions: SessionOptions = {
 };
 
 export function getSession(req: Request | any, res: any) {
-  return getIronSession<SessionUser>(req, res, sessionOptions);
+  return getIronSession<SessionData>(req, res, sessionOptions);
 }
