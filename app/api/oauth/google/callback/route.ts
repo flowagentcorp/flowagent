@@ -7,27 +7,21 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-function makeUUID() {
-  try {
-    // @ts-ignore
-    return (globalThis as any).crypto?.randomUUID?.() ?? require("crypto").randomUUID();
-  } catch {
-    return require("crypto").randomUUID();
-  }
-}
-
 export async function GET(req: Request) {
   try {
     const url = new URL(req.url);
     const code = url.searchParams.get("code");
+    const state = url.searchParams.get("state");
 
-    if (!code) {
+    if (!code || !state) {
       return NextResponse.redirect(
-        `${process.env.NEXT_PUBLIC_BASE_URL}/connect/google?error=no_code`
+        `${process.env.NEXT_PUBLIC_BASE_URL}/connect/google?error=missing_code`
       );
     }
 
-    // 1) TOKEN EXCHANGE
+    const { agent_id } = JSON.parse(decodeURIComponent(state));
+
+    // Exchange code for tokens
     const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -41,16 +35,17 @@ export async function GET(req: Request) {
     });
 
     const tokens = await tokenRes.json();
-    if (!tokenRes.ok) {
+    if (!tokens.access_token) {
       console.error("Token error:", tokens);
       return NextResponse.redirect(
-        `${process.env.NEXT_PUBLIC_BASE_URL}/connect/google?error=token`
+        `${process.env.NEXT_PUBLIC_BASE_URL}/connect/google?error=token_failed`
       );
     }
 
-    const { access_token, refresh_token, scope, token_type, expires_in } = tokens;
+    const { access_token, refresh_token, scope, token_type, expires_in } =
+      tokens;
 
-    // 2) GET PROFILE → GET EMAIL
+    // Fetch Gmail profile
     const profileRes = await fetch(
       "https://www.googleapis.com/gmail/v1/users/me/profile",
       {
@@ -59,62 +54,50 @@ export async function GET(req: Request) {
     );
 
     const profile = await profileRes.json();
-    if (!profileRes.ok) {
-      console.error("Profile error:", profile);
-      return NextResponse.redirect(
-        `${process.env.NEXT_PUBLIC_BASE_URL}/connect/google?error=profile`
-      );
-    }
-
     const email = profile.emailAddress;
 
-    // 3) CHECK IF EMAIL ALREADY EXISTS
-    const { data: existing } = await supabase
-      .from("client_credentials")
-      .select("agent_id")
-      .eq("email_connected", email)
-      .maybeSingle();
+    // Write to Supabase
+    const { error } = await supabase.from("client_credentials").upsert(
+      {
+        id: crypto.randomUUID(),
+        agent_id,
+        provider: "google",
+        access_token,
+        refresh_token,
+        scope,
+        token_type,
+        email_connected: email,
+        expiry_timestamp: new Date(
+          Date.now() + expires_in * 1000
+        ).toISOString(),
+        updated_at: new Date().toISOString(),
+        created_at: new Date().toISOString(),
+      },
+      { onConflict: "agent_id" }
+    );
 
-    let agent_id = existing?.agent_id ?? makeUUID();
-
-    // 4) UPSERT (email je UNIQUE — takže každý email = jedna identita)
-    const row = {
-      id: makeUUID(),
-      agent_id,
-      provider: "google",
-      access_token,
-      refresh_token,
-      scope,
-      token_type,
-      email_connected: email,
-      expiry_timestamp: new Date(Date.now() + expires_in * 1000).toISOString(),
-      updated_at: new Date().toISOString(),
-      created_at: new Date().toISOString(),
-    };
-
-    const { error: upsertErr } = await supabase
-      .from("client_credentials")
-      .upsert(row, { onConflict: "email_connected" });
-
-    if (upsertErr) {
-      console.error("Supabase error:", upsertErr);
+    if (error) {
+      console.error("Supabase error:", error);
       return NextResponse.redirect(
-        `${process.env.NEXT_PUBLIC_BASE_URL}/connect/google?error=supabase`
+        `${process.env.NEXT_PUBLIC_BASE_URL}/connect/google?error=db_error`
       );
     }
 
-    // 5) SET SESSION
+    // SAVE SESSION (important)
     const res = NextResponse.redirect(
       `${process.env.NEXT_PUBLIC_BASE_URL}/connect/google?status=connected`
     );
 
     const session = await getSession(req, res);
-    session.user = { agent_id, email };
+    session.user = {
+      agent_id,
+      email,
+    };
     await session.save();
 
     return res;
   } catch (err) {
-    console.error("Callback exception:", err);
+    console.error("OAuth callback error:", err);
     return NextResponse.redirect(
       `${process.env.NEXT_PUBLIC_BASE_URL}/connect/google?error=exception`
     );
