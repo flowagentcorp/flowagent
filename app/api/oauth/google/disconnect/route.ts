@@ -12,14 +12,15 @@ export async function POST(req: Request) {
   const session = await getSession(req, res);
 
   const user = session.user;
-  const agent_id = user?.agent_id;
 
-  if (!agent_id) {
+  if (!user || !user.agent_id) {
     return NextResponse.json(
       { error: "Not authenticated" },
       { status: 401 }
     );
   }
+
+  const agent_id = user.agent_id;
 
   const { error } = await supabase
     .from("client_credentials")
