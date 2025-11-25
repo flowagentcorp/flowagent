@@ -32,8 +32,13 @@ export async function POST(req: Request) {
     );
   }
 
-  session.user.email = undefined;
+  // SAFE UPDATE – avoids TS error
+  if (session.user) {
+    session.user.email = undefined;
+  }
+
   await session.save();
 
   return NextResponse.json({ success: true });
 }
+
