@@ -1,15 +1,8 @@
 import { NextResponse } from "next/server";
 
-// vygenerujeme agent_id ak nie je poslaný (model 1)
 export async function GET(req: Request) {
-  const url = new URL(req.url);
-  // môžeš poslať volunteerne ?agent_id=... ak chceš re-use
-  let agent_id = url.searchParams.get("agent_id");
-  if (!agent_id) {
-    // modernny Node: crypto.randomUUID()
-    agent_id = (globalThis as any).crypto?.randomUUID?.() || 
-               require("crypto").randomUUID();
-  }
+  // vždy vygenerovať nový agent_id pre každeho klienta
+  const agent_id = crypto.randomUUID();
 
   const state = encodeURIComponent(JSON.stringify({ agent_id }));
 
