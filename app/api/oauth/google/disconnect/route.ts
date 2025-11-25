@@ -11,16 +11,14 @@ export async function POST(req: Request) {
   const res = new NextResponse();
   const session = await getSession(req, res);
 
-  const user = session.user;
-
-  if (!user || !user.agent_id) {
+  if (!session.user?.agent_id) {
     return NextResponse.json(
       { error: "Not authenticated" },
       { status: 401 }
     );
   }
 
-  const agent_id = user.agent_id;
+  const agent_id = session.user.agent_id;
 
   const { error } = await supabase
     .from("client_credentials")
@@ -34,10 +32,7 @@ export async function POST(req: Request) {
     );
   }
 
-  session.user = {
-    ...user,
-    email: undefined,
-  };
+  session.user.email = undefined;
   await session.save();
 
   return NextResponse.json({ success: true });
