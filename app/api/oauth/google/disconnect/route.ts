@@ -34,7 +34,10 @@ export async function POST(req: Request) {
     );
   }
 
-  user.email = undefined;
+  session.user = {
+    ...user,
+    email: undefined,
+  };
   await session.save();
 
   return NextResponse.json({ success: true });
