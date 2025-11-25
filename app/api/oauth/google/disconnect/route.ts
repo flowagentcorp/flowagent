@@ -11,17 +11,17 @@ export async function POST(req: Request) {
   const res = new NextResponse();
   const session = await getSession(req, res);
 
-  const user = session.user;
+  const agent_id = session.user?.agent_id;
 
-  if (!user || !user.agent_id) {
+  // Check if user is authenticated
+  if (!agent_id) {
     return NextResponse.json(
       { error: "Not authenticated" },
       { status: 401 }
     );
   }
 
-  const agent_id = user.agent_id;
-
+  // Delete Gmail credentials for this agent
   const { error } = await supabase
     .from("client_credentials")
     .delete()
@@ -34,7 +34,8 @@ export async function POST(req: Request) {
     );
   }
 
-  session.user = { ...user, email: undefined };
+  // Remove connected email from session
+  session.user.email = undefined;
   await session.save();
 
   return NextResponse.json({ success: true });
