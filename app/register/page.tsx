@@ -73,7 +73,7 @@ export default function RegisterPage() {
         body: JSON.stringify({
           full_name: formData.fullName,
           email: formData.email,
-          phone: '', // Optional for now
+          password: formData.password,
         }),
       });
 
@@ -90,15 +90,16 @@ export default function RegisterPage() {
       setTimeout(() => {
         window.location.href = '/dashboard';
       }, 2000);
-    } catch (err: any) {
-      setError(err.message || 'Failed to create account. Please try again.');
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to create account. Please try again.'
+      setError(message);
     } finally {
       setIsLoading(false);
     }
   };
 
   const handleGoogleSignup = () => {
-    window.location.href = '/api/oauth/google/start';
+    window.location.href = '/login/google';
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {

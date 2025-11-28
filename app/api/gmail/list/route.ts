@@ -1,36 +1,45 @@
-// app/api/gmail/list/route.ts
-import { NextResponse } from "next/server";
-import { getSession } from "@/lib/session";
-import { createClient } from "@supabase/supabase-js";
+import { NextResponse } from 'next/server'
+import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { createClient } from '@supabase/supabase-js'
 
-export async function GET(req: Request) {
-  const res = new NextResponse();
-  const session = await getSession(req, res);
+export async function GET() {
+  const supabase = await createServerSupabaseClient()
+  const {
+    data: { user },
+    error,
+  } = await supabase.auth.getUser()
 
-  if (!session.user?.agent_id) {
-    return NextResponse.json(
-      { error: "Not authenticated (no session)" },
-      { status: 401 }
-    );
+  if (error || !user) {
+    return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
   }
 
-  const supabase = createClient(
+  const { data: agent, error: agentError } = await supabase
+    .from('agents')
+    .select('id')
+    .eq('auth_user_id', user.id)
+    .single()
+
+  if (agentError || !agent) {
+    return NextResponse.json({ error: 'Agent not found' }, { status: 404 })
+  }
+
+  const serviceClient = createClient(
     process.env.SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!
-  );
+  )
 
-  const { data, error } = await supabase
-    .from("credentials")
-    .select("*")
-    .eq("agent_id", session.user.agent_id)
-    .single();
+  const { data, error: credentialsError } = await serviceClient
+    .from('credentials')
+    .select('*')
+    .eq('agent_id', agent.id)
+    .single()
 
-  if (error) {
+  if (credentialsError) {
     return NextResponse.json(
-      { error: "Credentials not found", details: error },
+      { error: 'Credentials not found', details: credentialsError },
       { status: 500 }
-    );
+    )
   }
 
-  return NextResponse.json({ oauth: data });
+  return NextResponse.json({ oauth: data })
 }

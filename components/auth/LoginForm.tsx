@@ -28,7 +28,7 @@ export default function LoginForm() {
       const response = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email }),
+        body: JSON.stringify({ email, password }),
       });
 
       const data = await response.json();
@@ -41,15 +41,16 @@ export default function LoginForm() {
       setTimeout(() => {
         window.location.href = '/dashboard';
       }, 1000);
-    } catch (err: any) {
-      setError(err.message || 'Invalid email or password. Please try again.');
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Invalid email or password. Please try again.'
+      setError(message);
     } finally {
       setIsLoading(false);
     }
   };
 
   const handleGoogleLogin = () => {
-    window.location.href = '/api/oauth/google/start';
+    window.location.href = '/login/google';
   };
 
   return (
