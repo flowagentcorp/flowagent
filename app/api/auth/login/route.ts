@@ -1,33 +1,33 @@
-import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
-import { getSession } from "@/lib/session";
-
-const supabase = createClient(
-  process.env.SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { NextResponse } from 'next/server'
 
 export async function POST(req: Request) {
-  const { email } = await req.json();
+  try {
+    const { email, password } = await req.json()
 
-  const { data, error } = await supabase
-    .from("agents")
-    .select("*")
-    .eq("email", email)
-    .single();
+    if (!email || !password) {
+      return NextResponse.json(
+        { error: 'Email and password required' },
+        { status: 400 }
+      )
+    }
 
-  if (error || !data) {
-    return NextResponse.json({ error: "User not found" }, { status: 400 });
+    const supabase = await createServerSupabaseClient()
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    })
+
+    if (error || !data.session) {
+      return NextResponse.json(
+        { error: error?.message || 'Invalid credentials' },
+        { status: 401 }
+      )
+    }
+
+    return NextResponse.json({ success: true, user: data.user, session: data.session })
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unexpected error'
+      return NextResponse.json({ error: message }, { status: 500 })
+    }
   }
-
-  const res = NextResponse.json({ success: true, agent_id: data.id });
-  const session = await getSession(req, res);
-
-  session.user = {
-    agent_id: data.id,
-    email: data.email,
-  };
-
-  await session.save();
-  return res;
-}

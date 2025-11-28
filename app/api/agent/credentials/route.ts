@@ -1,29 +1,34 @@
-import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
-import { getSession } from "@/lib/session";
+import { NextResponse } from 'next/server'
+import { createServerSupabaseClient } from '@/lib/supabase/server'
 
-const supabase = createClient(
-  process.env.SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+export async function GET() {
+  const supabase = await createServerSupabaseClient()
+  const {
+    data: { user },
+    error,
+  } = await supabase.auth.getUser()
 
-export async function GET(req: Request) {
-  const res = new NextResponse();
-  const session = await getSession(req, res);
+  if (error || !user) {
+    return NextResponse.json({ email_connected: null }, { status: 401 })
+  }
 
-  const agent_id = session.user?.agent_id;
+  const { data: agent, error: agentError } = await supabase
+    .from('agents')
+    .select('id')
+    .eq('auth_user_id', user.id)
+    .single()
 
-  if (!agent_id) {
-    return NextResponse.json({ email_connected: null });
+  if (agentError || !agent) {
+    return NextResponse.json({ email_connected: null }, { status: 404 })
   }
 
   const { data } = await supabase
-    .from("client_credentials")
-    .select("email_connected")
-    .eq("agent_id", agent_id)
-    .single();
+    .from('client_credentials')
+    .select('email_connected')
+    .eq('agent_id', agent.id)
+    .single()
 
   return NextResponse.json({
     email_connected: data?.email_connected ?? null,
-  });
+  })
 }

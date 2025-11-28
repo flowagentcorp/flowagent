@@ -92,9 +92,10 @@ export async function POST(req: Request) {
       success: true,
       watchData,
     });
-  } catch (err: any) {
+  } catch (err: unknown) {
+    const error = err instanceof Error ? err : new Error("Unknown error");
     return NextResponse.json(
-      { error: "Unexpected server error", details: err.message },
+      { error: "Unexpected server error", details: error.message },
       { status: 500 }
     );
   }

@@ -60,10 +60,11 @@ export async function GET(req: Request) {
       client_secret: GOOGLE_CLIENT_SECRET
     });
 
-  } catch (err: any) {
-    console.error("credentials/get error:", err);
+  } catch (err: unknown) {
+    const error = err instanceof Error ? err : new Error('Unknown error');
+    console.error("credentials/get error:", error);
     return NextResponse.json(
-      { error: "server_error", details: err.message },
+      { error: "server_error", details: error.message },
       { status: 500 }
     );
   }
