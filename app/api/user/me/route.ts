@@ -1,12 +1,21 @@
-// app/api/user/me/route.ts
-import { NextResponse } from "next/server";
-import { getSession } from "@/lib/session";
+import { NextResponse } from 'next/server'
+import { createServerSupabaseClient } from '@/lib/supabase/server'
 
-export async function GET(request: Request) {
-  const response = new NextResponse();
-  const session = await getSession(request, response);
+export async function GET() {
+  const supabase = await createServerSupabaseClient()
+  const {
+    data: { user },
+    error,
+  } = await supabase.auth.getUser()
 
-  return NextResponse.json({
-    user: session.user || null,
-  });
+  if (error || !user) {
+    return NextResponse.json({ user: null, error: error?.message }, { status: 401 })
+  }
+
+  const { data: agent } = await supabase
+    .from('agents')
+    .select('*')
+    .single()
+
+  return NextResponse.json({ user, agent })
 }

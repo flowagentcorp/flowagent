@@ -22,9 +22,10 @@ export async function POST(req: Request) {
     });
 
     return NextResponse.json({ ok: true });
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const err = error instanceof Error ? error : new Error("Unknown error");
     return NextResponse.json(
-      { error: error.message || "Webhook failed" },
+      { error: err.message || "Webhook failed" },
       { status: 500 }
     );
   }

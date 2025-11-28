@@ -103,10 +103,11 @@ export async function POST(req: Request) {
       access_token: tokenData.access_token,
       expires_at,
     });
-  } catch (err: any) {
-    console.error("refresh error:", err);
+  } catch (err: unknown) {
+    const error = err instanceof Error ? err : new Error("Unknown error");
+    console.error("refresh error:", error);
     return NextResponse.json(
-      { error: "server_error", details: err.message },
+      { error: "server_error", details: error.message },
       { status: 500 }
     );
   }

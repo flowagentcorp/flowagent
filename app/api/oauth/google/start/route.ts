@@ -1,21 +1,34 @@
-import { NextResponse } from "next/server";
-import { getSession } from "@/lib/session";
+import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { NextResponse } from 'next/server'
 
-export async function GET(req: Request) {
-  const res = new NextResponse();
-  const session = await getSession(req, res);
+export async function GET() {
+  const supabase = await createServerSupabaseClient()
+  const {
+    data: { user },
+    error,
+  } = await supabase.auth.getUser()
 
-  // agent_id musí byť uložený v session (toto je unikátna identita užívateľa)
-  const agent_id = session.user?.agent_id;
-
-  if (!agent_id) {
+  if (error || !user) {
     return NextResponse.json(
-      { error: "Missing agent_id. User must be logged in." },
-      { status: 400 }
-    );
+      { error: 'User must be logged in' },
+      { status: 401 }
+    )
   }
 
-  const state = encodeURIComponent(JSON.stringify({ agent_id }));
+  const { data: agent, error: agentError } = await supabase
+    .from('agents')
+    .select('id')
+    .eq('auth_user_id', user.id)
+    .single()
+
+  if (agentError || !agent) {
+    return NextResponse.json(
+      { error: 'Agent profile not found' },
+      { status: 404 }
+    )
+  }
+
+  const state = encodeURIComponent(JSON.stringify({ agent_id: agent.id }));
 
   const oauthUrl =
     "https://accounts.google.com/o/oauth2/v2/auth?" +
