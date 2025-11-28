@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/response'
+import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
 const supabase = createClient(
@@ -52,7 +52,6 @@ export async function GET(req: Request) {
     const profile = await profileRes.json()
     const email = profile.emailAddress
 
-    // 🔥 FIX: Changed onConflict to match the UNIQUE constraint (agent_id, provider)
     const { error } = await supabase.from('client_credentials').upsert(
       {
         agent_id,
@@ -67,7 +66,7 @@ export async function GET(req: Request) {
         ).toISOString(),
         updated_at: new Date().toISOString(),
       },
-      { onConflict: 'agent_id,provider' } // ✅ Fixed: match UNIQUE(agent_id, provider)
+      { onConflict: 'agent_id,provider' }
     )
 
     if (error) {
