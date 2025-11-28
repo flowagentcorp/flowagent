@@ -2,12 +2,19 @@ import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { type Provider } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
 
-export async function GET(request: NextRequest) {
-  const providerParam = request.nextUrl.searchParams.get('provider') ?? 'google'
-  const allowedProviders: Provider[] = ['google']
-  const provider = allowedProviders.includes(providerParam as Provider)
-    ? (providerParam as Provider)
+const allowedProviders = ['google'] as const
+
+type AllowedProvider = (typeof allowedProviders)[number]
+
+function resolveProvider(providerParam: string | null): Provider {
+  const provider = providerParam ?? 'google'
+  return allowedProviders.includes(provider as AllowedProvider)
+    ? (provider as AllowedProvider)
     : 'google'
+}
+
+export async function GET(request: NextRequest) {
+  const provider = resolveProvider(request.nextUrl.searchParams.get('provider'))
   const supabase = await createServerSupabaseClient()
   const redirectTo = `${request.nextUrl.origin}/api/auth/callback`
 
