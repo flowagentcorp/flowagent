@@ -1,10 +1,10 @@
 import { type NextRequest, NextResponse } from 'next/server'
-import { createClient, type CookieOptions } from '@supabase/ssr'
+import { createServerClient, type CookieOptions } from '@supabase/ssr'
 
 export async function updateSession(request: NextRequest) {
   const response = NextResponse.next({ request: { headers: request.headers } })
 
-  const supabase = createClient(
+  const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
