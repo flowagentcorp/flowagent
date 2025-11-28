@@ -63,7 +63,8 @@ export async function POST(req: Request) {
         { status: 404 }
       )
 
-    let { access_token, refresh_token } = creds
+    let access_token = creds.access_token
+    const { refresh_token } = creds
 
     let r = await gmailFetch(access_token, messageId)
 
@@ -90,10 +91,10 @@ export async function POST(req: Request) {
 
     const msg = await r.json()
 
-    const headers = msg.payload?.headers || []
+    const headers = (msg.payload?.headers || []) as { name?: string; value?: string }[]
     const getHeader = (name: string) =>
-      headers.find((h: any) => h.name.toLowerCase() === name.toLowerCase())
-        ?.value || null
+      headers.find((h) => h.name?.toLowerCase() === name.toLowerCase())?.value ||
+      null
 
     const from = getHeader('From') || ''
     const subject = getHeader('Subject') || ''
@@ -102,8 +103,12 @@ export async function POST(req: Request) {
     let body_plain = ''
     if (msg.payload?.parts) {
       const part =
-        msg.payload.parts.find((p: any) => p.mimeType === 'text/plain') ||
-        msg.payload.parts.find((p: any) => p.mimeType === 'text/html')
+        msg.payload.parts.find(
+          (p: { mimeType?: string }) => p.mimeType === 'text/plain'
+        ) ||
+        msg.payload.parts.find(
+          (p: { mimeType?: string }) => p.mimeType === 'text/html'
+        )
       if (part?.body?.data)
         body_plain = Buffer.from(part.body.data, 'base64').toString('utf8')
     }
@@ -132,9 +137,10 @@ export async function POST(req: Request) {
     }
 
     return NextResponse.json({ success: true, payload: finalPayload })
-  } catch (err: any) {
+  } catch (err: unknown) {
+    const error = err instanceof Error ? err : new Error('Unknown error')
     return NextResponse.json(
-      { error: err.message || 'fetch-message failed' },
+      { error: error.message || 'fetch-message failed' },
       { status: 500 }
     )
   }
