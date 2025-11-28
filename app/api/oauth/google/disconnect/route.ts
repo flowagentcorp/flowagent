@@ -1,44 +1,41 @@
-import { NextResponse } from "next/server";
-import { getSession } from "@/lib/session";
-import { createClient } from "@supabase/supabase-js";
+import { NextResponse } from 'next/server'
+import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { createClient } from '@supabase/supabase-js'
 
-const supabase = createClient(
+const serviceClient = createClient(
   process.env.SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+)
 
-export async function POST(req: Request) {
-  const res = new NextResponse();
-  const session = await getSession(req, res);
+export async function POST() {
+  const supabase = await createServerSupabaseClient()
+  const {
+    data: { user },
+    error,
+  } = await supabase.auth.getUser()
 
-  const agent_id = session.user?.agent_id;
-
-  if (!agent_id) {
-    return NextResponse.json(
-      { error: "Not authenticated" },
-      { status: 401 }
-    );
+  if (error || !user) {
+    return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
   }
 
-  const { error } = await supabase
-    .from("client_credentials")
+  const { data: agent, error: agentError } = await supabase
+    .from('agents')
+    .select('id')
+    .eq('auth_user_id', user.id)
+    .single()
+
+  if (agentError || !agent) {
+    return NextResponse.json({ error: 'Agent not found' }, { status: 404 })
+  }
+
+  const { error: deleteError } = await serviceClient
+    .from('client_credentials')
     .delete()
-    .eq("agent_id", agent_id);
+    .eq('agent_id', agent.id)
 
-  if (error) {
-    return NextResponse.json(
-      { error: error.message },
-      { status: 400 }
-    );
+  if (deleteError) {
+    return NextResponse.json({ error: deleteError.message }, { status: 400 })
   }
 
-  // SAFE UPDATE – avoids TS error
-  if (session.user) {
-    session.user.email = undefined;
-  }
-
-  await session.save();
-
-  return NextResponse.json({ success: true });
+  return NextResponse.json({ success: true })
 }
-

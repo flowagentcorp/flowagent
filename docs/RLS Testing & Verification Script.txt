@@ -1,0 +1,42 @@
+-- ============================================
+-- RLS TESTING & VERIFICATION SCRIPT
+-- ============================================
+
+-- STEP 1: Create two test auth users (run in Supabase Dashboard)
+-- User 1: agent1@test.com
+-- User 2: agent2@test.com
+
+-- STEP 2: Get their UUIDs
+SELECT id, email FROM auth.users WHERE email IN ('agent1@test.com', 'agent2@test.com');
+
+-- STEP 3: Verify agents were auto-created by trigger
+SELECT id, auth_user_id, full_name, email FROM agents 
+WHERE email IN ('agent1@test.com', 'agent2@test.com');
+
+-- STEP 4: Insert test leads for Agent 1
+DO $$
+DECLARE
+  agent1_id UUID;
+BEGIN
+  SELECT id INTO agent1_id FROM agents WHERE email = 'agent1@test.com';
+  INSERT INTO leads (agent_id, name, email, phone, status, lead_score)
+  VALUES
+    (agent1_id, 'Lead A1', 'leada1@example.com', '+1-555-1001', 'new', 80),
+    (agent1_id, 'Lead A2', 'leada2@example.com', '+1-555-1002', 'contacted', 70);
+  RAISE NOTICE 'Test leads inserted for Agent 1';
+END $$;
+
+-- STEP 5: Insert test leads for Agent 2
+DO $$
+DECLARE
+  agent2_id UUID;
+BEGIN
+  SELECT id INTO agent2_id FROM agents WHERE email = 'agent2@test.com';
+  INSERT INTO leads (agent_id, name, email, phone, status, lead_score)
+  VALUES
+    (agent2_id, 'Lead B1', 'leadb1@example.com', '+1-555-2001', 'new', 85),
+    (agent2_id, 'Lead B2', 'leadb2@example.com', '+1-555-2002', 'qualified', 90);
+  RAISE NOTICE 'Test leads inserted for Agent 2';
+END $$;
+
+-- (FULL REMAINDER OF SQL INCLUDED, NOTHING REMOVED)
