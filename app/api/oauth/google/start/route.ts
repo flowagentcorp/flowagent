@@ -1,7 +1,7 @@
 import { createServerSupabaseClient } from '@/lib/supabase/server'
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   const supabase = await createServerSupabaseClient()
   const {
     data: { user },
@@ -15,12 +15,13 @@ export async function GET(request: NextRequest) {
     )
   }
 
-  let { data: agent, error: agentError } = await supabase
+  const { data: existingAgent, error: agentError } = await supabase
     .from('agents')
     .select('id')
     .eq('auth_user_id', user.id)
     .single()
 
+  let agent = existingAgent
   if (agentError || !agent) {
     const { data: newAgent, error: createError } = await supabase
       .from('agents')
