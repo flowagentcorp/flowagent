@@ -20,7 +20,7 @@ export async function GET(req: Request) {
 
     const { agent_id } = JSON.parse(decodeURIComponent(state));
 
-    // EXCHANGE CODE FOR TOKENS
+    // 🔥 Exchange code for tokens
     const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -42,7 +42,7 @@ export async function GET(req: Request) {
 
     const { access_token, refresh_token, scope, token_type, expires_in } = tokens;
 
-    // GET EMAIL FROM GOOGLE
+    // 🔥 Fetch Gmail account email
     const profileRes = await fetch(
       "https://www.googleapis.com/gmail/v1/users/me/profile",
       { headers: { Authorization: `Bearer ${access_token}` } }
@@ -50,14 +50,13 @@ export async function GET(req: Request) {
     const profile = await profileRes.json();
     const email = profile.emailAddress;
 
-    // REMOVE OLD CREDENTIALS TO PREVENT CONFLICTS
-    await supabase
-      .from("client_credentials")
+    // 🔥 Delete old auth rows (avoids unique violation)
+    await supabase.from("client_credentials")
       .delete()
       .eq("agent_id", agent_id)
       .eq("provider", "google");
 
-    // 🔥 UPSERT WORKING FIX
+    // 🔥 Supabase UPSERT — correct TypeScript + DB compatible
     const { error: insertError } = await supabase
       .from("client_credentials")
       .upsert(
@@ -70,15 +69,12 @@ export async function GET(req: Request) {
           token_type,
           email_connected: email,
           expiry_timestamp: new Date(Date.now() + expires_in * 1000).toISOString(),
-        },
-        {
-          onConflict: ["agent_id", "provider"], // <--- KĽÚČOVÉ
-          ignoreDuplicates: false,
-        }
+        } as any,          // <<< ⛔ FIXES BUILD ERROR
+        { onConflict: "agent_id,provider" } // <<< STRING, nie array
       );
 
     if (insertError) {
-      console.error("Insert error:", insertError);
+      console.log(insertError);
       return NextResponse.redirect(
         `${process.env.NEXT_PUBLIC_BASE_URL}/connect/google?error=db_error`
       );
@@ -89,10 +85,9 @@ export async function GET(req: Request) {
     );
 
   } catch (err) {
-    console.error("OAuth callback error:", err);
+    console.error(err);
     return NextResponse.redirect(
       `${process.env.NEXT_PUBLIC_BASE_URL}/connect/google?error=exception`
     );
   }
 }
-
