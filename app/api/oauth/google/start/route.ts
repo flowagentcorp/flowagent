@@ -19,7 +19,7 @@ export async function GET(request: NextRequest) {
     .from('agents')
     .select('id')
     .eq('auth_user_id', user.id)
-    .single()
+    .maybeSingle()
 
   if (agentError || !agent) {
     return NextResponse.json(
