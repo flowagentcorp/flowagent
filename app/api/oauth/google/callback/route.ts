@@ -20,6 +20,7 @@ export async function GET(req: Request) {
 
     const { agent_id } = JSON.parse(decodeURIComponent(state))
 
+    // Exchange OAuth code -> access token
     const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -41,39 +42,44 @@ export async function GET(req: Request) {
 
     const { access_token, refresh_token, scope, token_type, expires_in } = tokens
 
-    // fetch gmail profile
+    // Fetch Gmail profile for email
     const profileRes = await fetch(
       'https://www.googleapis.com/gmail/v1/users/me/profile',
       { headers: { Authorization: `Bearer ${access_token}` } }
     )
-
     const profile = await profileRes.json()
     const email = profile.emailAddress
 
-    // remove old credentials(safe)
-    await supabase.from('client_credentials')
+    // Remove old credentials (avoid conflict)
+    await supabase
+      .from("client_credentials")
       .delete()
-      .eq('agent_id', agent_id)
-      .eq('provider', 'google')
+      .eq("agent_id", agent_id)
+      .eq("provider", "google")
 
-    // UPSERT FIX – WORKING VERSION
+    // ----------------------
+    // MAIN FIX 🔥 UPSERT
+    // ----------------------
     const { error: insertError } = await supabase
-      .from('client_credentials')
-      .upsert({
-        agent_id,
-        provider: 'google',
-        access_token,
-        refresh_token,
-        scope,
-        token_type,
-        email_connected: email,
-        expiry_timestamp: new Date(Date.now() + expires_in * 1000).toISOString(),
-      }, {
-        onConflict: 'agent_id,provider'
-      })
+      .from("client_credentials")
+      .upsert(
+        {
+          agent_id,
+          provider: "google",
+          access_token,
+          refresh_token,
+          scope,
+          token_type,
+          email_connected: email,
+          expiry_timestamp: new Date(Date.now() + expires_in * 1000).toISOString(),
+        },
+        {
+          onConflict: ['agent_id', 'provider'], // <-- THIS is NOW correct
+        }
+      )
 
     if (insertError) {
-      console.error(insertError)
+      console.error("INSERT ERROR:", insertError)
       return NextResponse.redirect(
         `${process.env.NEXT_PUBLIC_BASE_URL}/connect/google?error=db_error`
       )
@@ -84,7 +90,7 @@ export async function GET(req: Request) {
     )
 
   } catch (err) {
-    console.error(err)
+    console.error("Callback exception:", err)
     return NextResponse.redirect(
       `${process.env.NEXT_PUBLIC_BASE_URL}/connect/google?error=exception`
     )
