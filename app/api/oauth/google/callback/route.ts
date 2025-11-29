@@ -52,14 +52,14 @@ export async function GET(req: Request) {
     const profile = await profileRes.json()
     const email = profile.emailAddress
 
-    // DELETE any existing credentials first to avoid conflicts
+    // DELETE any existing credentials first — optional but safe
     await supabase
       .from('client_credentials')
       .delete()
       .eq('agent_id', agent_id)
       .eq('provider', 'google')
 
-    // Upsert Gmail credentials safely
+    // 🔥 FIXED UPSERT — FINAL WORKING VERSION
     const { error: insertError } = await supabase
       .from('client_credentials')
       .upsert(
@@ -73,7 +73,7 @@ export async function GET(req: Request) {
           email_connected: email,
           expiry_timestamp: new Date(Date.now() + expires_in * 1000).toISOString(),
         },
-        { onConflict: 'agent_id,provider' }
+        { onConflict: ['agent_id', 'provider'] }
       )
 
     if (insertError) {
@@ -86,6 +86,7 @@ export async function GET(req: Request) {
     return NextResponse.redirect(
       `${process.env.NEXT_PUBLIC_BASE_URL}/connect/google?status=connected`
     )
+
   } catch (err) {
     console.error('OAuth callback error:', err)
     return NextResponse.redirect(
