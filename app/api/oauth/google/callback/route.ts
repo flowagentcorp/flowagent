@@ -85,4 +85,14 @@ export async function GET(req: Request) {
     }
 
     return NextResponse.redirect(
-      `${process.env.NEXT_PUBLIC_BASE_URL}/connect/google?statu_
+      `${process.env.NEXT_PUBLIC_BASE_URL}/connect/google?status=connected`
+    );
+
+  } catch (err) {
+    console.error("OAuth callback error:", err);
+    return NextResponse.redirect(
+      `${process.env.NEXT_PUBLIC_BASE_URL}/connect/google?error=exception`
+    );
+  }
+}
+
