@@ -1,20 +1,18 @@
-import { FlatCompat } from '@eslint/eslintrc'
+import type { NextConfig } from 'next'
 
-const compat = new FlatCompat({
-  baseDirectory: import.meta.dirname,
-})
+const nextConfig: NextConfig = {
+  // Enable React strict mode for better development experience
+  reactStrictMode: true,
 
-const eslintConfig = [
-  ...compat.extends('next/core-web-vitals', 'next/typescript'),
-  {
-    rules: {
-      '@typescript-eslint/no-explicit-any': 'warn',
-      '@typescript-eslint/no-unused-vars': 'warn',
-      '@typescript-eslint/no-empty-object-type': 'off',
-      'prefer-const': 'warn',
-      'react/no-unescaped-entities': 'off',
-    },
+  // Optimize images
+  images: {
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: '**.supabase.co',
+      },
+    ],
   },
-]
+}
 
-export default eslintConfig
+export default nextConfig
