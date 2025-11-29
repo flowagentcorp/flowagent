@@ -34,7 +34,6 @@ export async function GET(req: Request) {
 
     const tokens = await tokenRes.json()
     if (!tokens.access_token) {
-      console.error('Token error:', tokens)
       return NextResponse.redirect(
         `${process.env.NEXT_PUBLIC_BASE_URL}/connect/google?error=token_failed`
       )
@@ -42,42 +41,39 @@ export async function GET(req: Request) {
 
     const { access_token, refresh_token, scope, token_type, expires_in } = tokens
 
+    // fetch gmail profile
     const profileRes = await fetch(
       'https://www.googleapis.com/gmail/v1/users/me/profile',
-      {
-        headers: { Authorization: `Bearer ${access_token}` },
-      }
+      { headers: { Authorization: `Bearer ${access_token}` } }
     )
 
     const profile = await profileRes.json()
     const email = profile.emailAddress
 
-    // DELETE any existing credentials first — optional but safe
-    await supabase
-      .from('client_credentials')
+    // remove old credentials(safe)
+    await supabase.from('client_credentials')
       .delete()
       .eq('agent_id', agent_id)
       .eq('provider', 'google')
 
-    // 🔥 FIXED UPSERT — FINAL WORKING VERSION
+    // UPSERT FIX – WORKING VERSION
     const { error: insertError } = await supabase
       .from('client_credentials')
-      .upsert(
-        {
-          agent_id,
-          provider: 'google',
-          access_token,
-          refresh_token,
-          scope,
-          token_type,
-          email_connected: email,
-          expiry_timestamp: new Date(Date.now() + expires_in * 1000).toISOString(),
-        },
-        { onConflict: ['agent_id', 'provider'] }
-      )
+      .upsert({
+        agent_id,
+        provider: 'google',
+        access_token,
+        refresh_token,
+        scope,
+        token_type,
+        email_connected: email,
+        expiry_timestamp: new Date(Date.now() + expires_in * 1000).toISOString(),
+      }, {
+        onConflict: 'agent_id,provider'
+      })
 
     if (insertError) {
-      console.error('Insert error:', insertError)
+      console.error(insertError)
       return NextResponse.redirect(
         `${process.env.NEXT_PUBLIC_BASE_URL}/connect/google?error=db_error`
       )
@@ -88,7 +84,7 @@ export async function GET(req: Request) {
     )
 
   } catch (err) {
-    console.error('OAuth callback error:', err)
+    console.error(err)
     return NextResponse.redirect(
       `${process.env.NEXT_PUBLIC_BASE_URL}/connect/google?error=exception`
     )
