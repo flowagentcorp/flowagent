@@ -59,19 +59,22 @@ export async function GET(req: Request) {
       .eq('agent_id', agent_id)
       .eq('provider', 'google')
 
-    // Now insert the new credentials
+    // Upsert Gmail credentials safely
     const { error: insertError } = await supabase
       .from('client_credentials')
-      .insert({
-        agent_id,
-        provider: 'google',
-        access_token,
-        refresh_token,
-        scope,
-        token_type,
-        email_connected: email,
-        expiry_timestamp: new Date(Date.now() + expires_in * 1000).toISOString(),
-      })
+      .upsert(
+        {
+          agent_id,
+          provider: 'google',
+          access_token,
+          refresh_token,
+          scope,
+          token_type,
+          email_connected: email,
+          expiry_timestamp: new Date(Date.now() + expires_in * 1000).toISOString(),
+        },
+        { onConflict: 'agent_id,provider' }
+      )
 
     if (insertError) {
       console.error('Insert error:', insertError)
