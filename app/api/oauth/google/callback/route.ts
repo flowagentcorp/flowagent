@@ -13,14 +13,12 @@ export async function GET(req: Request) {
     const state = url.searchParams.get('state')
 
     if (!code || !state) {
-      return NextResponse.redirect(
-        `${process.env.NEXT_PUBLIC_BASE_URL}/connect/google?error=missing_code`
-      )
+      return NextResponse.redirect(`${process.env.NEXT_PUBLIC_BASE_URL}/connect/google?error=missing_code`)
     }
 
     const { agent_id } = JSON.parse(decodeURIComponent(state))
 
-    // Exchange OAuth code -> access token
+    // Exchange OAuth code → tokens
     const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -35,14 +33,12 @@ export async function GET(req: Request) {
 
     const tokens = await tokenRes.json()
     if (!tokens.access_token) {
-      return NextResponse.redirect(
-        `${process.env.NEXT_PUBLIC_BASE_URL}/connect/google?error=token_failed`
-      )
+      return NextResponse.redirect(`${process.env.NEXT_PUBLIC_BASE_URL}/connect/google?error=token_failed`)
     }
 
     const { access_token, refresh_token, scope, token_type, expires_in } = tokens
 
-    // Fetch Gmail profile for email
+    // Fetch Gmail email
     const profileRes = await fetch(
       'https://www.googleapis.com/gmail/v1/users/me/profile',
       { headers: { Authorization: `Bearer ${access_token}` } }
@@ -50,16 +46,14 @@ export async function GET(req: Request) {
     const profile = await profileRes.json()
     const email = profile.emailAddress
 
-    // Remove old credentials (avoid conflict)
+    // Remove old records
     await supabase
       .from("client_credentials")
       .delete()
       .eq("agent_id", agent_id)
       .eq("provider", "google")
 
-    // ----------------------
-    // MAIN FIX 🔥 UPSERT
-    // ----------------------
+    // 🔥 UPSERT with valid onConflict
     const { error: insertError } = await supabase
       .from("client_credentials")
       .upsert(
@@ -74,25 +68,19 @@ export async function GET(req: Request) {
           expiry_timestamp: new Date(Date.now() + expires_in * 1000).toISOString(),
         },
         {
-          onConflict: ['agent_id', 'provider'], // <-- THIS is NOW correct
+          onConflict: "agent_id,provider"   // ← správny formát pre Supabase V2
         }
       )
 
     if (insertError) {
-      console.error("INSERT ERROR:", insertError)
-      return NextResponse.redirect(
-        `${process.env.NEXT_PUBLIC_BASE_URL}/connect/google?error=db_error`
-      )
+      console.error("UPSERT ERROR:", insertError)
+      return NextResponse.redirect(`${process.env.NEXT_PUBLIC_BASE_URL}/connect/google?error=db_error`)
     }
 
-    return NextResponse.redirect(
-      `${process.env.NEXT_PUBLIC_BASE_URL}/connect/google?status=connected`
-    )
+    return NextResponse.redirect(`${process.env.NEXT_PUBLIC_BASE_URL}/connect/google?status=connected`)
 
   } catch (err) {
-    console.error("Callback exception:", err)
-    return NextResponse.redirect(
-      `${process.env.NEXT_PUBLIC_BASE_URL}/connect/google?error=exception`
-    )
+    console.error("OAuth callback EXCEPTION:", err)
+    return NextResponse.redirect(`${process.env.NEXT_PUBLIC_BASE_URL}/connect/google?error=exception`)
   }
 }
