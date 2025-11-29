@@ -15,25 +15,51 @@ export default async function DashboardPage() {
   const { data: agent, error: agentError } = await supabase
     .from('agents')
     .select('*')
-    .single()
+    .eq('auth_user_id', user.id)
+    .maybeSingle()
 
-  if (agentError || !agent) return <div>Error loading agent profile</div>
+  // If no agent, try to create one
+  if (!agent) {
+    const { data: newAgent, error: createError } = await supabase
+      .from('agents')
+      .insert({
+        auth_user_id: user.id,
+        full_name: user.user_metadata?.full_name || user.email || 'User',
+        email: user.email || '',
+      })
+      .select()
+      .single()
 
-  const { data: leads, error: leadsError } = await supabase
+    if (createError) {
+      return <div className="p-10 text-white">Error creating agent profile. Please contact support.</div>
+    }
+
+    // Redirect to refresh with new agent
+    redirect('/dashboard')
+  }
+
+  if (agentError) {
+    return <div className="p-10 text-white">Error loading agent profile</div>
+  }
+
+  const { data: leads } = await supabase
     .from('leads')
     .select('*')
+    .eq('agent_id', agent.id)
     .order('created_at', { ascending: false })
     .limit(10)
 
   const { data: messages } = await supabase
     .from('messages')
     .select(`*, leads (name, email)`)
+    .eq('agent_id', agent.id)
     .order('created_at', { ascending: false })
     .limit(5)
 
   const { data: tasks } = await supabase
     .from('scheduled_tasks')
     .select(`*, leads (name, email)`)
+    .eq('agent_id', agent.id)
     .eq('status', 'pending')
     .order('scheduled_for', { ascending: true })
     .limit(5)
@@ -48,22 +74,18 @@ export default async function DashboardPage() {
       <section className="grid gap-6 md:grid-cols-2">
         <div className="rounded-xl border border-white/10 bg-white/5 p-6">
           <h2 className="text-xl font-semibold mb-4">Recent Leads</h2>
-          {leadsError ? (
-            <p className="text-sm text-red-400">Failed to load leads.</p>
-          ) : (
-            <ul className="space-y-3">
-              {(leads ?? []).map((lead) => (
-                <li key={lead.id} className="rounded-lg border border-white/10 bg-white/5 p-3">
-                  <p className="font-medium">{lead.name}</p>
-                  <p className="text-sm text-slate-400">{lead.email}</p>
-                  <p className="text-xs text-slate-500">Status: {lead.status}</p>
-                </li>
-              ))}
-              {!leads?.length && (
-                <li className="text-sm text-slate-400">No leads yet.</li>
-              )}
-            </ul>
-          )}
+          <ul className="space-y-3">
+            {(leads ?? []).map((lead) => (
+              <li key={lead.id} className="rounded-lg border border-white/10 bg-white/5 p-3">
+                <p className="font-medium">{lead.name}</p>
+                <p className="text-sm text-slate-400">{lead.email}</p>
+                <p className="text-xs text-slate-500">Status: {lead.status}</p>
+              </li>
+            ))}
+            {!leads?.length && (
+              <li className="text-sm text-slate-400">No leads yet.</li>
+            )}
+          </ul>
         </div>
 
         <div className="rounded-xl border border-white/10 bg-white/5 p-6">

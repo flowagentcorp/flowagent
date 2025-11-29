@@ -16,7 +16,7 @@ export async function GET() {
     .from('agents')
     .select('id')
     .eq('auth_user_id', user.id)
-    .single()
+    .maybeSingle()
 
   if (agentError || !agent) {
     return NextResponse.json({ email_connected: null }, { status: 404 })
@@ -26,7 +26,7 @@ export async function GET() {
     .from('client_credentials')
     .select('email_connected')
     .eq('agent_id', agent.id)
-    .single()
+    .maybeSingle()
 
   return NextResponse.json({
     email_connected: data?.email_connected ?? null,
