@@ -13,23 +13,25 @@ export async function GET(req: Request) {
 
     if (!code) return NextResponse.redirect(`${process.env.NEXT_PUBLIC_BASE_URL}/login?error=no_code`)
 
-    // 🔥 získame usera priamo cez Supabase Auth
-    const { data: tokenData, error: tokenError } = await supabase.auth.exchangeCodeForSession(code)
+    // 🔥 získame session cez Supabase OAuth (Google login)
+    const { data, error: tokenError } = await supabase.auth.exchangeCodeForSession(code)
     if (tokenError) throw tokenError
 
-    const agent_id = tokenData.user.id
+    const session = data.session
+    const agent_id = data.user.id
 
-    // 🔥 Získame gmail profile + OAuth tokeny
-    const { access_token, refresh_token, expires_in, scope, token_type } = tokenData.session.provider_token!!
+    if (!session?.provider_token) throw new Error("No google provider token returned")
 
-    const profileRes = await fetch("https://www.googleapis.com/gmail/v1/users/me/profile", {
+    const { access_token, refresh_token, expires_in, scope, token_type } = session.provider_token as any
+
+    // 🔥 Gmail profil
+    const profileReq = await fetch("https://www.googleapis.com/gmail/v1/users/me/profile", {
       headers: { Authorization: `Bearer ${access_token}` }
     })
-
-    const profile = await profileRes.json()
+    const profile = await profileReq.json()
     const email = profile.emailAddress
 
-    // 🔥 Uloženie credov (automatický override)
+    // 🔥 Save / Upsert credentials
     const { error } = await supabase
       .from("client_credentials")
       .upsert({
@@ -47,8 +49,9 @@ export async function GET(req: Request) {
 
     return NextResponse.redirect(`${process.env.NEXT_PUBLIC_BASE_URL}/dashboard?gmail=linked`)
   }
+
   catch(err){
-    console.error(err)
+    console.error("OAuth callback error:", err)
     return NextResponse.redirect(`${process.env.NEXT_PUBLIC_BASE_URL}/login?error=oauth_fail`)
   }
 }
