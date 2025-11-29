@@ -1,4 +1,5 @@
 import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
 
 export async function GET(request: NextRequest) {
@@ -18,17 +19,23 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(new URL('/login?error=oauth', request.url))
   }
 
-  // CRITICAL: Check if agent exists, if not create one
+  // Use service role client to bypass RLS
+  const serviceClient = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
+
   if (user) {
-    const { data: existingAgent } = await supabase
+    // Check if agent exists
+    const { data: existingAgent } = await serviceClient
       .from('agents')
       .select('id')
       .eq('auth_user_id', user.id)
       .maybeSingle()
 
+    // If no agent, create one
     if (!existingAgent) {
-      // Agent doesn't exist, create one
-      const { error: createError } = await supabase
+      const { error: createError } = await serviceClient
         .from('agents')
         .insert({
           auth_user_id: user.id,
@@ -38,7 +45,7 @@ export async function GET(request: NextRequest) {
 
       if (createError) {
         console.error('Failed to create agent:', createError)
-        // Try to continue anyway, maybe the trigger will handle it
+        return NextResponse.redirect(new URL('/login?error=db_error', request.url))
       }
     }
   }
