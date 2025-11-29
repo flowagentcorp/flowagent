@@ -52,56 +52,32 @@ export async function GET(req: Request) {
     const profile = await profileRes.json()
     const email = profile.emailAddress
 
-    // Check if credential already exists
-    const { data: existingCred } = await supabase
+    // DELETE any existing credentials first to avoid conflicts
+    await supabase
       .from('client_credentials')
-      .select('id')
+      .delete()
       .eq('agent_id', agent_id)
       .eq('provider', 'google')
-      .single()
 
-    if (existingCred) {
-      // Update existing credential
-      const { error } = await supabase
-        .from('client_credentials')
-        .update({
-          access_token,
-          refresh_token,
-          scope,
-          token_type,
-          email_connected: email,
-          expiry_timestamp: new Date(Date.now() + expires_in * 1000).toISOString(),
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', existingCred.id)
+    // Now insert the new credentials
+    const { error: insertError } = await supabase
+      .from('client_credentials')
+      .insert({
+        agent_id,
+        provider: 'google',
+        access_token,
+        refresh_token,
+        scope,
+        token_type,
+        email_connected: email,
+        expiry_timestamp: new Date(Date.now() + expires_in * 1000).toISOString(),
+      })
 
-      if (error) {
-        console.error('Update error:', error)
-        return NextResponse.redirect(
-          `${process.env.NEXT_PUBLIC_BASE_URL}/connect/google?error=db_error`
-        )
-      }
-    } else {
-      // Insert new credential
-      const { error } = await supabase
-        .from('client_credentials')
-        .insert({
-          agent_id,
-          provider: 'google',
-          access_token,
-          refresh_token,
-          scope,
-          token_type,
-          email_connected: email,
-          expiry_timestamp: new Date(Date.now() + expires_in * 1000).toISOString(),
-        })
-
-      if (error) {
-        console.error('Insert error:', error)
-        return NextResponse.redirect(
-          `${process.env.NEXT_PUBLIC_BASE_URL}/connect/google?error=db_error`
-        )
-      }
+    if (insertError) {
+      console.error('Insert error:', insertError)
+      return NextResponse.redirect(
+        `${process.env.NEXT_PUBLIC_BASE_URL}/connect/google?error=db_error`
+      )
     }
 
     return NextResponse.redirect(
