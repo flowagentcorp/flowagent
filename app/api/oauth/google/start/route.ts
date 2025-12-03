@@ -1,7 +1,7 @@
 import { createServerSupabaseClient } from '@/lib/supabase/server'
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   const supabase = await createServerSupabaseClient()
   const {
     data: { user },
@@ -15,17 +15,31 @@ export async function GET(request: NextRequest) {
     )
   }
 
-  const { data: agent, error: agentError } = await supabase
+  const { data: existingAgent, error: agentError } = await supabase
     .from('agents')
     .select('id')
     .eq('auth_user_id', user.id)
     .maybeSingle()
 
+  let agent = existingAgent
   if (agentError || !agent) {
-    return NextResponse.json(
-      { error: 'Agent profile not found' },
-      { status: 404 }
-    )
+    const { data: newAgent, error: createError } = await supabase
+      .from('agents')
+      .insert({
+        auth_user_id: user.id,
+        email: user.email,
+        full_name: user.user_metadata?.full_name || user.email,
+      })
+      .select('id')
+      .single()
+
+    if (createError) {
+      return NextResponse.json(
+        { error: 'Failed to create agent profile' },
+        { status: 500 }
+      )
+    }
+    agent = newAgent
   }
 
   const state = encodeURIComponent(JSON.stringify({ agent_id: agent.id }));
